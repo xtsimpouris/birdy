@@ -1,0 +1,36 @@
+.bird-thumb {
+  float: left;
+  padding-right: 5px;
+  width: 40px;
+}
+
+.bird-thumb img {
+  max-width: 30px;
+  max-height: 20px;
+  margin: 0 auto;
+}
+
+#afui .list li {
+  width: 100%;
+  padding: 10px 20px 10px 10px;
+}
+
+#bird-view .bird-content .bird-img {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  padding: 10px;
+}
+
+#bird-view .bird-content .bird-section {
+  clear: both;
+  padding: 5px 0;
+}
+
+#bird-view .bird-content .bird-section .bird-section-title {
+  font-weight: 800;
+  padding-right: 5px;
+  text-align: right;
+  width: 50%;
+  float: left;
+}

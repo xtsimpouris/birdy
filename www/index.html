@@ -15,7 +15,7 @@
 })();
 </script>
 
-        <title>App Framework Kitchen Sink</title>
+        <title>Drymos App</title>
         <meta http-equiv="Content-type" content="text/html; charset=utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0">
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -46,6 +46,8 @@
       <link rel="stylesheet" type="text/css" href="plugins/css/af.scroller.css"  />
       <link rel="stylesheet" type="text/css" href="plugins/css/af.selectBox.css"  />        
         
+      <link rel="stylesheet" type="text/css" href="css/drymos.css"  />
+      
         <!-- uncomment for intel.xdk apps 
         <script type="text/javascript" charset="utf-8" src="intelxdk.js"></script>
         <script type="text/javascript" charset="utf-8" src="xhr.js"></script>
@@ -97,15 +99,16 @@
         <script type="text/javascript">
             /* This function runs once the page is loaded, but intel.xdk is not yet active */
             //$.ui.animateHeaders=false;
-             var search=document.location.search.toLowerCase().replace("?","");
-             //if(!search)
+            var search=document.location.search.toLowerCase().replace("?","");
+            //if(!search)
+            
             $.ui.useOSThemes=true;
             if(search.length>0) //Android fix has too many buggy issues on iOS - can't preview with $.os.android
             {
 
                $.ui.useOSThemes=true;
-                if(search=="win8")
-                    $.os.ie=true;
+                if(search == "win8")
+                    $.os.ie = true;
                 $.ui.ready(function(){
                     $("#afui").get(0).className=search;
                 });
@@ -113,14 +116,12 @@
             
             var webRoot = "./";
             // $.os.android=true;
-            //$.ui.autoLaunch = false;
+            // $.ui.autoLaunch = false;
             $.ui.openLinksNewTab = false;
-            $.ui.splitview=false;
-            
+            $.ui.splitview = false;
 
             $(document).ready(function(){
-                  // $.ui.launch();
-
+                initApp();
             });
             
             /* This code is used to run as soon as intel.xdk activates */
@@ -131,6 +132,8 @@
                 //hide splash screen
                 intel.xdk.device.hideSplashScreen();
                 $.ui.blockPageScroll(); //block the page from scrolling at the header/footer
+                
+                initApp();
             };
             document.addEventListener("intel.xdk.device.ready", onDeviceReady, false);
 
@@ -147,6 +150,7 @@
             }
 
 
+            /*
             if($.os.android||$.os.ie||search=="android"){
                 $.ui.ready(function(){
                     $("#main .list").append("<li><a id='toggleAndroidTheme'>Toggle Theme Color</a></li>");
@@ -158,7 +162,268 @@
                             $el.addClass("light");
                     });
                 });
-            }                        
+            }
+            */
+            
+            function initApp() {
+                var view_title = getLSItem('title', 'species-name', 0);
+                setLSItem('title', view_title);
+                if (view_title == 'common-name') {
+                    $('#viewSpeciesNames').show();
+                    $('#viewCommonNames').hide();
+                }
+                else if (view_title == 'species-name') {
+                    $('#viewSpeciesNames').hide();
+                    $('#viewCommonNames').show();
+                }
+                
+            
+                var rdb = getLSItem('db', null, 0);
+                if (!rdb)
+                    updateDB();
+                else
+                    restoreMainList(rdb);
+                
+                $('#search-list').on('input', refreshResuts);
+            }
+            
+            function refreshResuts() {
+                var val = $('#search-list').val().trim().toLowerCase();
+                var local_db = getLSItem('db', null, 0);
+                
+                for(d in local_db) {
+                    if ((val == '') || (local_db[d].stuff.indexOf(val) >= 0) || (local_db[d].description.indexOf(val) >= 0))
+                        $("#bird-" + d).show();
+                    else
+                        $("#bird-" + d).hide();
+                }
+            }
+            
+            function viewCommonNames() {
+                setLSItem('title', 'common-name');
+                $('#viewSpeciesNames').show();
+                $('#viewCommonNames').hide();
+                restoreMainList();
+            }
+            function viewSpeciesNames() {
+                setLSItem('title', 'species-name');
+                $('#viewSpeciesNames').hide();
+                $('#viewCommonNames').show();
+                restoreMainList();
+            }
+            
+            function updateDB() {
+                var baseurl = 'http://fileserv.wcl.ee.upatras.gr/drymos/fetch-database';
+                showPageSpinner('Retrieving database<BR>Please wait..');
+
+                $.get(baseurl, function(remote_db) {
+                    for(d in remote_db) {
+                        // console.log(remote_db[d]);
+                        var stuff = '';
+                        stuff += remote_db[d].common_name.toLowerCase() + ' | ';
+                        stuff += remote_db[d].species_name.toLowerCase() + ' | ';
+                        stuff += joinArray(', ', remote_db[d].conservation_status) + ' | ';
+                        stuff += joinArray(', ', remote_db[d].family) + ' | ';
+                        stuff += joinArray(', ', remote_db[d].group) + ' | ';
+                        stuff += joinArray(', ', remote_db[d].habitat) + ' | ';
+                        remote_db[d].stuff = stuff;
+                    }
+
+                    setLSItem('db', remote_db);
+                    restoreMainList(remote_db);
+                    hidePageSpinner();
+                }, 'json');
+            }
+            
+            function joinArray(glue, myarray) {
+                var ret = '';
+                if (!myarray)
+                    return ret;
+                    
+                for(k in myarray) {
+                    if (ret != '')
+                        ret += glue;
+                    ret += myarray[k];
+                }
+                return ret;
+            }
+            
+            function playBirdSong() {
+                document.getElementById('bird-audio').play();
+                $('.play-bird-song').hide();
+                $('.stop-bird-song').show();
+            }
+            function stopBirdSong() {
+                document.getElementById('bird-audio').pause();
+                $('.play-bird-song').show();
+                $('.stop-bird-song').hide();
+            }
+            
+            
+            function viewBird(num) {
+                var local_db = getLSItem('db', null, 0);
+                if (!(num in local_db))
+                    return;
+                
+                
+                var view_title = getLSItem('title', 'species-name', 0);
+                var title = (view_title == 'common-name') ? local_db[num].common_name : local_db[num].species_name;
+                $("#bird-view .bird-title").html(title);
+                
+                $("#bird-view .bird-content").html('<img class="bird-img" src="http://fileserv.wcl.ee.upatras.gr/drymos/' + local_db[num].image + '">')
+                
+                if (local_db[num].audio) {
+                    $("#bird-view .bird-content").append('<audio id="bird-audio" src="http://fileserv.wcl.ee.upatras.gr/drymos/' + local_db[num].audio + '" preload="auto"></audio>')
+                    $('.play-bird-song').show();
+                }
+                else {
+                    $('.play-bird-song').hide();
+                }
+                $('.stop-bird-song').hide();
+                
+                $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Common name</div>' + local_db[num].common_name + '</div>')
+                $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Species name</div>' + local_db[num].species_name + '</div>')
+                if (local_db[num].male_body_length && local_db[num].female_body_length) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Male body length</div>' + local_db[num].male_body_length + '</div>')
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Female body length</div>' + local_db[num].female_body_length + '</div>')
+                }
+                else if (local_db[num].male_body_length) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Body length</div>' + local_db[num].male_body_length + '</div>')
+                }
+                if (local_db[num].male_wingspan && local_db[num].female_wingspan) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Male wingspan</div>' + local_db[num].male_wingspan + '</div>')
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Female wingspan</div>' + local_db[num].female_wingspan + '</div>')
+                }
+                else if (local_db[num].male_wingspan) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Wingspan</div>' + local_db[num].male_wingspan + '</div>')
+                }
+                if (local_db[num].conservation_status) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Conservation status</div>' + joinArray(', ', local_db[num].conservation_status) + '</div>')
+                }
+                if (local_db[num].family) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Family</div>' + joinArray(', ', local_db[num].family) + '</div>')
+                }
+                if (local_db[num].group) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Group</div>' + joinArray(', ', local_db[num].group) + '</div>')
+                }
+                if (local_db[num].habitat) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Habitat</div>' + joinArray(', ', local_db[num].habitat) + '</div>')
+                }
+                if (local_db[num].description) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">Description</div>' + local_db[num].description + '</div>')
+                }
+                if (local_db[num].references) {
+                    $("#bird-view .bird-content").append('<div class="bird-section"><div class="bird-section-title">References</div>' + local_db[num].references + '</div>')
+                }
+            }
+            
+            function restoreMainList(remote_db) {
+                $('#main #bird_list').html('');
+                var local_db = remote_db || getLSItem('db', null, 0);
+                var view_title = getLSItem('title', 'species-name', 0);
+                
+                for(d in local_db) {
+                    // console.log(remote_db[d]);
+                    var title = (view_title == 'common-name') ? local_db[d].common_name : local_db[d].species_name;
+                    var baudio = '';
+                    if (local_db[d].audio)
+                        baudio = '<audio id="bird-audio" src="http://fileserv.wcl.ee.upatras.gr/drymos/' + local_db[d].audio + '" preload="auto"></audio>';
+
+                    $('#main #bird_list').append(
+                        $('<li>').html(
+                            '<a href="#bird-view" id="" class="icon big" onclick="viewBird(' + d + ')">' + 
+                                '<div class="bird-thumb">' +
+                                    '<img src="http://fileserv.wcl.ee.upatras.gr/drymos/' + local_db[d].image + '">' +
+                                '</div>' + 
+                                title +
+                                baudio + 
+                            '</a>'
+                        )
+                        .attr('id', 'bird-' + d)
+                    );
+                }
+            }
+            
+
+            // this function will show a spinner and a transparent div on top of all doms
+            function showPageSpinner(msgText){
+              $('<div>')
+                .attr('style','width:100%;height:100%;background-color:black;opacity:0.8;position: fixed;z-index: 99999999999;top: 0px;right: 0px;left: 0px;bottom: 0px;text-align: center; color: white;')
+                .html('<BR><BR><BR><BR>')
+                .append('<h3>' + msgText + '</h3>')
+                .append('<div class="ui-icon ui-icon-loading spin" style="margin: 0 auto;"></div>')
+                .appendTo($('body'))
+                .attr('id','loadingBG');
+            }
+
+            // this function will hide the spinner and the div
+            function hidePageSpinner (){
+                $('#loadingBG').remove();
+            }
+
+            /**
+             * LocalStorage functions to simplify storing/retrieving objects
+             **/
+
+            // Gets something from localstorage
+            function getLSItem(id, default_value, valid_age) {
+              var dataJSON = window.localStorage.getItem(id);
+              
+              // This is the first time
+              if (!dataJSON)
+                return default_value;
+              
+              if (isNaN(valid_age) || valid_age < 0) {
+                // This hould never happen
+              }
+              
+              var ret;
+              try {
+                ret = JSON.parse(dataJSON);
+              }
+              catch(e) {
+                // Something went wrong while decoding data, maybe corrupted?
+                return default_value;
+              }
+              
+              // Invalid object (probably will never happen)
+              if (!ret.when)
+                return default_value;
+              
+              // 0 for valid_age => it lives forever
+              if (valid_age === 0)
+                return ret.data;
+              
+              // Now in seconds
+              var now = Math.round(new Date().getTime() / 1000);
+              
+              // Data is more old that accepted
+              if (now - ret.when > valid_age)
+                return default_value;
+              
+              return ret.data;
+            }
+
+            // Sets something to local storage
+            // If "something" is null, it clears that id
+            function setLSItem(id, data2save) {
+              if (data2save == null) {
+                window.localStorage.removeItem(id);
+                return;
+              }
+              
+              var dataJSON = JSON.stringify({
+                // Data to save
+                data: data2save,
+                // Time in seconds
+                when: Math.round(new Date().getTime() / 1000)
+              });
+              window.localStorage.setItem(id, dataJSON);
+              
+              // In case we want to chain things!
+              return data2save;
+            }
+            
         </script>
 
 </head>
@@ -167,58 +432,45 @@
         <div id="afui">
             <!-- this is the splashscreen you see. -->
             <div id="splashscreen" class='ui-loader heavy'>
-                App Framework
+                Drymos
                 <br>
-                <br>    <span class='ui-icon ui-icon-loading spin'></span>
-                <h1>Starting app</h1>
-
+                <br>
+                <span class='ui-icon ui-icon-loading spin'></span>
+                <h1>Please wait</h1>
             </div>
+            
             <div id="header">
                 <a id='menubadge' onclick='af.ui.toggleSideMenu()' class='menuButton'></a>                 
             </div>
+
             <div id="content">
-                <div title='Welcome' id="main" class="panel" selected="true" data-load="loadedPanel" data-unload="unloadedPanel" data-tab="navbar_home">
-                    <h2 class='expanded' onclick='showHide(this,"main_info");'>Welcome</h2>
-
-                    <p id='main_info'>Welcome to the kitchen sink demo for App Framework. Here you will find samples of how to use the App Framework libraries. Please select an option from below.</p>
-                    <ul class="list">
-                        <li class='red'>
-                            <a href="#af" id='aflink' class='icon home big'>App Framework</a>
-                        </li>
-                        <li class="blue">
-                            <a href="#afuidemo">App Framework UI</a>
-                        </li>
-                        <li>
-                            <a href="index.html" data-ignore="true">App Framework theme</a>
-                        </li>
-                         <li>
-                            <a href="index.html?ios" data-ignore="true">iOS theme</a>
-                        </li>
-                        <li>
-                            <a href="index.html?android" data-ignore="true">Android theme</a>
-                        </li>
-                        <li>
-                            <a href="index.html?win8" data-ignore="true">Win8 theme</a>
-                        </li>
-                        <li>
-                            <a href="index.html?bb" data-ignore="true">BB10 theme</a>
-                        </li>
-                       <li>
-                            <a href="index.html?ios7" data-ignore="true">ios7</a>
-                        </li>
-                         <li>
-                            <a href="index.html?tizen" data-ignore="true">tizen</a>
-                        </li>
-
-
+                <div title='Drymos app' id="main" class="panel" selected="true" data-load="loadedPanel" data-unload="unloadedPanel" data-tab="main-sidebar">
+                
+                    <input type="search" placeholder="search" id="search-list">
+                    <ul id="bird_list" class="list">
                     </ul>
                 </div>
+                
+                <div title="AppFramework" id="bird-view" class="panel" data-nav="menu_AppFramework">
+                    <header id="bird-view-header">
+                        <a id="backButton" onclick="$.ui.goBack()" class='button'>Home</a>
+                            <h1 class="bird-title">Custom Header</h1>
+                        <a class="play-bird-song button icon check" style="float:right" onclick="playBirdSong();">Hear it</a>
+                        <a class="stop-bird-song button icon close" style="float:right" onclick="stopBirdSong();">Stop</a>
+                    </header>
+                    
+                    <div class="bird-content">
+                        
+                    </div>
+                </div>
+                
+                
                 <!---------------------------------------------->
                 <div title="AppFramework" id="af" class="panel" data-nav="menu_AppFramework" data-header="testheader">
                     <!-- <header><span>This is an inline header in a panel.  Below is an inline footer</span></header>-->
                         <h2 class='expanded' onclick='showHide(this,"AppFramework_info");'>AppFramework</h2>
 
-                    <p id='AppFramework_info'>AppFramework is a blazingly fast query selector tool that is optmimized for HTML5 browsers.</p>
+                    <p id='AppFramework_info'>11111 AppFramework is a blazingly fast query selector tool that is optmimized for HTML5 browsers.</p>
                     <ul class="list">
                         <li>
                             <a id="tester"  onClick="$.ui.scrollToBottom('af')" class='flipAnimation'>Go To Bottom</a>
@@ -2145,7 +2397,8 @@ The parent id for this div is "content". Let's verify it.
             <!-- navbar -->
             
             <div id="navbar">
-                <a href="#main/1/3" id='navbar_home' class='icon home'>home <span class='af-badge lr'>3</span></a><a href="#af" id='navbar_js' class="icon target">selectors</a><a href="#afuidemo" id='navbar_ui' class="icon picture">ui</a><a href="#afweb" id='navbar_plugins' class="icon key">plugins</a>
+                <a href="#af" id='navbar_js' class="icon target">Identify</a>
+                <a href="#afuidemo" id='navbar_ui' class="icon picture">Drymos</a>
             </div>
         
             <footer id='footerui'>
@@ -2165,159 +2418,25 @@ The parent id for this div is "content". Let's verify it.
                     <h1>Custom Header</h1>
                 <a class="button icon settings" style="float:right">Button</a>
             </header>
-            <!-- ------------------------------------------ -->
-            <nav>
-                <ul class="list">
-                    <li class="divider" class="icon home">Home</li>
-                    <li>
-                        <a href="#af">Selectors</a>
-                    </li>
-                 <li class="divider">UI</li>
-                    <li>
-                        <a href="#aftransitions">Transitions</a>
-                    </li>
-                    <li>
-                        <a href="#afuidemo">UI Elements</a>
-                    </li>
-                    <li>
-                        <a href="#uiapi">APIs</a>
-                    </li>
-                 <li class="divider">Plugins</li>
-                    <li>
-                        <a href="#webslider">Scroller</a>
-                    </li>
-                    <li>
-                        <a href="#webanimate">CSS3 animation</a>
-                    </li>
-                     <li>
-                        <a href="#webactionsheet">Action sheet</a>
-                    </li>
 
-                 <li class="divider">Menus</li>
-                    <li>
-                        <a  onclick="$.ui.toggleHeaderMenu();">Toggle Header</a>
-                    </li>
-                    <li>
-                        <a  onclick="$.ui.toggleSideMenu()">Toggle Side</a>
-                    </li>
-                    <li>
-                        <a  onclick="$.ui.toggleNavMenu()">Toggle Footer</a>
-                    </li>
-                </ul>
-            </nav>
-            <nav id="menu_AppFramework">
+
+            <nav id="main-sidebar">
                 <ul class="list">
-                     <li class="divider">Selector</li>
+                    <li class="divider">Access</li>
                     <li>
-                        <a href="#af1">$()</a>
+                        <a onclick="updateDB();">Update database</a>
                     </li>
-                    <li>
-                        <a href="#af2">$().length()</a>
+                 <li class="divider">Settings</li>
+                    <li id="viewCommonNames">
+                        <a onclick="viewCommonNames();">View <strong>common</strong> names</a>
                     </li>
-                    <li>
-                        <a href="#af3">$().find()</a>
-                    </li>
-                    <li>
-                        <a href="#af4">$().html()</a>
-                    </li>
-                    <li>
-                        <a href="#af5">$().text()</a>
-                    </li>
-                    <li>
-                        <a href="#af6">$().css()</a>
-                    </li>
-                    <li>
-                        <a href="#af7">$().empty()</a>
-                    </li>
-                    <li>
-                        <a href="#af8">$().hide()</a>
-                    </li>
-                    <li>
-                        <a href="#af9">$().show()</a>
-                    </li>
-                    <li>
-                        <a href="#af10">$().toggle()</a>
-                    </li>
-                    <li>
-                        <a href="#af11">$().val()</a>
-                    </li>
-                    <li>
-                        <a href="#af12">$().attr()</a>
-                    </li>
-                    <li>
-                        <a href="#af13">$().removeAttr()</a>
-                    </li>
-                    <li>
-                        <a href="#af14">$().remove()</a>
-                    </li>
-                    <li>
-                        <a href="#af15">$().addClass()</a>
-                    </li>
-                    <li>
-                        <a href="#af16">$().removeClass()</a>
-                    </li>
-                    <li>
-                        <a href="#af17">$().hasClass()</a>
-                    </li>
-                    <li>
-                        <a href="#af18">$().bind()</a>
-                    </li>
-                    <li>
-                        <a href="#af19">$().unbind()</a>
-                    </li>
-                    <li>
-                        <a href="#af20">$().trigger()</a>
-                    </li>
-                    <li>
-                        <a href="#af21">$().append()</a>
-                    </li>
-                    <li>
-                        <a href="#af22">$().prepend()</a>
-                    </li>
-                    <li>
-                        <a href="#af32">$().get(0)</a>
-                    </li>
-                    <li>
-                        <a href="#af31">$().offset()</a>
-                    </li>
-                    <li>
-                        <a href="#afparent">$().parent()</a>
-                    </li>
-                    <li>
-                        <a href="#af33">$().isArray()</a>
-                    </li>
-                    <li>
-                        <a href="#af34">$().isFunction()</a>
-                    </li>
-                    <li>
-                        <a href="#af23">$.jsonP()</a>
-                    </li>
-                    <li>
-                        <a href="#af24">$.ajax()</a>
-                    </li>
-                    <li>
-                        <a href="#af25">$.get(0)</a>
-                    </li>
-                    <li>
-                        <a href="#af26">$.post()</a>
-                    </li>
-                    <li>
-                        <a href="#af27">$.getJSON()</a>
-                    </li>
-                    <li>
-                        <a href="#af28">$.param()</a>
-                    </li>
-                    <li>
-                        <a href="#af29">$.parseJSON()</a>
-                    </li>
-                    <li>
-                        <a href="#af30">$.os</a>
+                    <li id="viewSpeciesNames">
+                        <a onclick="viewSpeciesNames();">View <strong>species</strong> names</a>
                     </li>
                 </ul>
             </nav>
-            <aside>
-                This is a chat aside
-            </aside>
+
+
         </div>
 
     </body>
